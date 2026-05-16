@@ -1,5 +1,8 @@
 streamlit
 pandas==2.3.3
+numpy
 openpyxl
 requests
 rapidfuzz
+gspread
+google-auth

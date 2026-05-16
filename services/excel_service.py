@@ -1,10 +1,13 @@
 from pathlib import Path
+import shutil
+from datetime import datetime
 
 import pandas as pd
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
+BACKUP_DIR = DATA_DIR / "backups"
 EXCEL_PATH = DATA_DIR / "articulos.xlsx"
 
 COLUMNAS = [
@@ -18,6 +21,7 @@ COLUMNAS = [
     "DOI",
     "Palabras Indexadas",
     "Resumen 3 lineas",
+    "Justificación categoría",
 ]
 
 
@@ -68,10 +72,28 @@ def cargar_articulos():
         return pd.DataFrame(columns=COLUMNAS)
 
 
-def guardar_articulos(df):
+def crear_backup_excel():
+    """Crea una copia de seguridad del Excel antes de sobrescribirlo."""
+    try:
+        if not EXCEL_PATH.exists():
+            return None
+
+        BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+        fecha = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = BACKUP_DIR / f"articulos_backup_{fecha}.xlsx"
+        shutil.copy2(EXCEL_PATH, backup_path)
+        return backup_path
+    except Exception:
+        return None
+
+
+def guardar_articulos(df, crear_backup=True):
     """Guarda el DataFrame completo en el Excel local."""
     try:
         crear_excel_si_no_existe()
+        if crear_backup:
+            crear_backup_excel()
+
         df = df.copy()
 
         for columna in COLUMNAS:
@@ -91,6 +113,17 @@ def agregar_articulo(nuevo_articulo):
         df = cargar_articulos()
         nuevo_df = pd.DataFrame([nuevo_articulo], columns=COLUMNAS)
         df = pd.concat([df, nuevo_df], ignore_index=True)
+        return guardar_articulos(df)
+    except Exception:
+        return False
+
+
+def agregar_articulos(nuevos_articulos):
+    """Agrega varios artículos al Excel de respaldo en una sola operación."""
+    try:
+        df = cargar_articulos()
+        nuevos_df = pd.DataFrame(nuevos_articulos, columns=COLUMNAS)
+        df = pd.concat([df, nuevos_df], ignore_index=True)
         return guardar_articulos(df)
     except Exception:
         return False
