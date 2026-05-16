@@ -12,16 +12,9 @@ from services.excel_service import (
     agregar_articulos,
     cargar_articulos,
     crear_excel_si_no_existe,
-    guardar_articulos,
-)
-from services.google_sheets_service import (
-    ERROR_CONEXION,
-    GoogleSheetsConnectionError,
-    add_article as add_google_article,
-    add_articles as add_google_articles,
     dataframe_to_csv,
     dataframe_to_excel,
-    sheet_to_dataframe,
+    guardar_articulos,
 )
 from services.scopus_import_service import (
     detectar_duplicados_importacion,
@@ -222,57 +215,48 @@ def filtrar_articulos(df):
     return df_filtrado
 
 
+@st.cache_data(show_spinner=False)
+def cargar_articulos_cacheado():
+    """Lee el Excel local con caché para evitar recargas innecesarias."""
+    return cargar_articulos()
+
+
+def invalidar_cache_articulos():
+    cargar_articulos_cacheado.clear()
+
+
 def cargar_articulos_principal():
-    """Carga Google Sheets como fuente principal y Excel local como respaldo."""
-    try:
-        df = sheet_to_dataframe()
-        guardar_articulos(df, crear_backup=False)
-        return df, "Google Sheets", None
-    except GoogleSheetsConnectionError as error:
-        return cargar_articulos(), "Excel local", str(error)
-    except Exception:
-        return cargar_articulos(), "Excel local", ERROR_CONEXION
+    """Carga artículos desde almacenamiento local."""
+    return cargar_articulos_cacheado(), "Excel local", None
 
 
 def agregar_articulo_principal(nuevo_articulo, fuente_datos):
-    """Guarda en Google Sheets o en Excel local si Sheets no está disponible."""
-    if fuente_datos == "Google Sheets":
-        try:
-            add_google_article(nuevo_articulo)
-            df_actualizado = sheet_to_dataframe()
-            guardar_articulos(df_actualizado, crear_backup=True)
-            return True, "Google Sheets", None
-        except Exception:
-            if agregar_articulo(nuevo_articulo):
-                return True, "Excel local", ERROR_CONEXION
-            return False, "Excel local", ERROR_CONEXION
-
+    """Guarda un artículo en Excel local con backup automático."""
     if agregar_articulo(nuevo_articulo):
+        invalidar_cache_articulos()
         return True, "Excel local", None
 
-    return False, "Excel local", "No se pudo guardar el artículo."
+    return (
+        False,
+        "Excel local",
+        "No se pudo guardar el artículo. Cierra el Excel si está abierto e inténtalo de nuevo.",
+    )
 
 
 def agregar_articulos_principal(nuevos_articulos, fuente_datos):
-    """Guarda lotes importados desde CSV en Google Sheets o Excel local."""
+    """Guarda lotes importados desde CSV en Excel local."""
     if not nuevos_articulos:
         return True, fuente_datos, None
 
-    if fuente_datos == "Google Sheets":
-        try:
-            add_google_articles(nuevos_articulos)
-            df_actualizado = sheet_to_dataframe()
-            guardar_articulos(df_actualizado, crear_backup=True)
-            return True, "Google Sheets", None
-        except Exception:
-            if agregar_articulos(nuevos_articulos):
-                return True, "Excel local", ERROR_CONEXION
-            return False, "Excel local", ERROR_CONEXION
-
     if agregar_articulos(nuevos_articulos):
+        invalidar_cache_articulos()
         return True, "Excel local", None
 
-    return False, "Excel local", "No se pudo importar el CSV."
+    return (
+        False,
+        "Excel local",
+        "No se pudo importar el CSV. Cierra el Excel si está abierto e inténtalo de nuevo.",
+    )
 
 
 def preparar_excel_descarga(df):
@@ -297,12 +281,7 @@ def main():
 
     inicializar_estado_formulario()
     df, fuente_datos, _ = cargar_articulos_principal()
-
-    if fuente_datos == "Google Sheets":
-        st.success("Base de datos conectada: Google Sheets.")
-    else:
-        st.warning(ERROR_CONEXION)
-        st.info("Se está usando Excel local como respaldo.")
+    st.success("Base de datos local activa: data/articulos.xlsx")
 
     st.header("1. Buscar artículo por DOI")
     doi_busqueda = st.text_input("DOI para buscar", placeholder="10.1000/xyz123")
@@ -382,13 +361,9 @@ def main():
                 if not registros:
                     st.warning("No hay registros nuevos para importar.")
                 elif guardado:
-                    if error_guardado:
-                        st.warning(error_guardado)
-                        st.info("Los registros válidos fueron importados en Excel local.")
-                    else:
-                        st.success(
-                            f"Se importaron {len(registros)} artículos en {fuente_guardado}."
-                        )
+                    st.success(
+                        f"Se importaron {len(registros)} artículos en {fuente_guardado}."
+                    )
                     df, fuente_datos, _ = cargar_articulos_principal()
                 else:
                     st.error(error_guardado or "No se pudo importar el CSV.")
@@ -478,11 +453,7 @@ def main():
             else:
                 if tipo_mensaje == "warning":
                     st.warning(mensaje)
-                if error_guardado:
-                    st.warning(error_guardado)
-                    st.info("El artículo fue guardado en Excel local como respaldo.")
-                else:
-                    st.success(f"Artículo registrado correctamente en {fuente_guardado}.")
+                st.success(f"Artículo registrado correctamente en {fuente_guardado}.")
                 df, fuente_datos, _ = cargar_articulos_principal()
 
     st.header("4. Artículos registrados")

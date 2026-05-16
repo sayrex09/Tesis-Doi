@@ -1,6 +1,6 @@
 # Gestor de Artículos Académicos
 
-Aplicación simple en Python y Streamlit para registrar artículos académicos de una revisión sistemática. La base principal es Google Sheets y, si no hay conexión o credenciales válidas, se usa el Excel local `data/articulos.xlsx` como respaldo.
+Aplicación simple en Python y Streamlit para registrar artículos académicos de una revisión sistemática. La base de datos es local y usa `data/articulos.xlsx`, con exportación auxiliar en CSV.
 
 ## Instalación
 
@@ -16,33 +16,15 @@ Desde la carpeta del proyecto:
 streamlit run app.py
 ```
 
-## Base de datos
-
-La base de datos principal es Google Sheets:
-
-```text
-https://docs.google.com/spreadsheets/d/1keQ5XgJu-dHpIyhcHqmNXUc6GRiw3wp8XEeh2nWddfQ/edit
-```
-
-El respaldo local es:
+## Base de Datos Local
 
 ```text
 data/articulos.xlsx
+data/articulos.csv
+data/backups/
 ```
 
-Si Google Sheets no responde, la aplicación muestra un mensaje amigable y sigue trabajando con Excel local.
-
-## Configuración de Google Sheets
-
-1. Crea una cuenta de servicio en Google Cloud.
-2. Descarga el JSON de credenciales.
-3. Comparte el Google Sheets con el correo `client_email` de la cuenta de servicio como editor.
-4. Copia `.streamlit/secrets.toml.example` como `.streamlit/secrets.toml`.
-5. Pega los valores reales del JSON en `.streamlit/secrets.toml`.
-
-Si `worksheet_name` queda vacío, la aplicación usará la primera pestaña del Google Sheets. Si indicas un nombre y no existe, la aplicación intentará crear esa pestaña.
-
-No subas `.streamlit/secrets.toml` a Git. El archivo está ignorado en `.gitignore`.
+Si `articulos.xlsx` no existe, se crea automáticamente con las columnas necesarias. Antes de sobrescribir el Excel, el sistema crea una copia en `data/backups/`.
 
 ## Búsqueda por DOI
 
@@ -75,7 +57,7 @@ La sección **Importar CSV de Scopus** permite cargar archivos exportados desde 
 - Clasifica automáticamente cada registro como `Macro`, `Meso`, `Micro` o `Pendiente`.
 - Genera `Justificación categoría`.
 - Detecta duplicados por DOI y similitud de título antes de guardar.
-- Guarda registros válidos en Google Sheets o, si falla la conexión, en Excel local.
+- Guarda registros válidos en el Excel local.
 
 Para archivos grandes, el guardado se hace por lotes y la detección de títulos similares usa un filtrado previo para evitar comparaciones innecesarias.
 

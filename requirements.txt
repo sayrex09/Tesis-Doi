@@ -4,5 +4,3 @@ numpy
 openpyxl
 requests
 rapidfuzz
-gspread
-google-auth

@@ -1,6 +1,7 @@
 from pathlib import Path
 import shutil
 from datetime import datetime
+from io import BytesIO
 
 import pandas as pd
 
@@ -9,6 +10,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 BACKUP_DIR = DATA_DIR / "backups"
 EXCEL_PATH = DATA_DIR / "articulos.xlsx"
+CSV_EXPORT_PATH = DATA_DIR / "articulos.csv"
 
 COLUMNAS = [
     "Categoria",
@@ -57,17 +59,24 @@ def crear_excel_si_no_existe():
         raise RuntimeError(f"No se pudo crear o preparar el Excel: {error}") from error
 
 
+def normalizar_dataframe(df):
+    """Asegura columnas, orden y valores vacíos consistentes para almacenamiento local."""
+    df = df.copy()
+
+    for columna in COLUMNAS:
+        if columna not in df.columns:
+            df[columna] = ""
+
+    return df[COLUMNAS].fillna("")
+
+
 def cargar_articulos():
     """Carga los artículos desde Excel como DataFrame."""
     try:
         crear_excel_si_no_existe()
         df = pd.read_excel(EXCEL_PATH, engine="openpyxl")
 
-        for columna in COLUMNAS:
-            if columna not in df.columns:
-                df[columna] = ""
-
-        return df[COLUMNAS].fillna("")
+        return normalizar_dataframe(df)
     except Exception:
         return pd.DataFrame(columns=COLUMNAS)
 
@@ -94,15 +103,12 @@ def guardar_articulos(df, crear_backup=True):
         if crear_backup:
             crear_backup_excel()
 
-        df = df.copy()
-
-        for columna in COLUMNAS:
-            if columna not in df.columns:
-                df[columna] = ""
-
-        df = df[COLUMNAS]
+        df = normalizar_dataframe(df)
         df.to_excel(EXCEL_PATH, index=False, engine="openpyxl")
+        df.to_csv(CSV_EXPORT_PATH, index=False, encoding="utf-8-sig")
         return True
+    except PermissionError:
+        return False
     except Exception:
         return False
 
@@ -127,3 +133,16 @@ def agregar_articulos(nuevos_articulos):
         return guardar_articulos(df)
     except Exception:
         return False
+
+
+def dataframe_to_csv(df):
+    """Convierte un DataFrame filtrado en CSV descargable."""
+    return normalizar_dataframe(df).to_csv(index=False).encode("utf-8-sig")
+
+
+def dataframe_to_excel(df):
+    """Convierte un DataFrame filtrado en Excel descargable."""
+    buffer = BytesIO()
+    normalizar_dataframe(df).to_excel(buffer, index=False, engine="openpyxl")
+    buffer.seek(0)
+    return buffer
