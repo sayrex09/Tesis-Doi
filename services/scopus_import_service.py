@@ -24,7 +24,9 @@ SCOPUS_COLUMN_ALIASES = {
     "source_title": ["Source title", "Journal", "Publication Name"],
     "volume": ["Volume", "Vol"],
     "issue": ["Issue", "Issues", "Volume, issues, pages"],
-    "pages": ["Page start", "Page end", "Pages", "Volume, issues, pages"],
+    "pages": ["Pages", "Page range", "Article number", "Art. No.", "Volume, issues, pages"],
+    "page_start": ["Page start", "Start page", "First page"],
+    "page_end": ["Page end", "End page", "Last page"],
     "citation_count": ["Citation count", "Cited by", "Citations"],
     "source_document_type": [
         "Source & document type",
@@ -38,6 +40,7 @@ SCOPUS_COLUMN_ALIASES = {
     "serial_identifiers": ["Serial identifiers (ISSN)", "ISSN", "ISBN"],
     "pubmed_id": ["PubMed ID", "PMID"],
     "publisher": ["Publisher"],
+    "url": ["URL", "Link", "Article URL", "Document URL"],
     "editors": ["Editor(s)", "Editors"],
     "language": ["Language of original document", "Language"],
     "abbreviated_source_title": ["Abbreviated source title", "Abbrev Source Title"],
@@ -196,6 +199,18 @@ def _extraer_citas(valor):
     return int(numero) if pd.notna(numero) else 0
 
 
+def _combinar_paginas(paginas, pagina_inicio="", pagina_fin=""):
+    paginas = _limpiar_celda(paginas)
+    pagina_inicio = _limpiar_celda(pagina_inicio)
+    pagina_fin = _limpiar_celda(pagina_fin)
+
+    if paginas:
+        return paginas
+    if pagina_inicio and pagina_fin and pagina_inicio != pagina_fin:
+        return f"{pagina_inicio}-{pagina_fin}"
+    return pagina_inicio or pagina_fin
+
+
 def _separar_keywords(texto):
     texto = _limpiar_celda(texto)
     if not texto:
@@ -292,6 +307,14 @@ def procesar_csv_scopus(archivo):
         _normalizar_tipo_documento
     )
     dois = _serie_limpia(df_original, mapping, "doi").map(limpiar_doi)
+    fuentes = _serie_limpia(df_original, mapping, "source_title")
+    volumenes = _serie_limpia(df_original, mapping, "volume")
+    numeros = _serie_limpia(df_original, mapping, "issue")
+    paginas = _serie_limpia(df_original, mapping, "pages")
+    paginas_inicio = _serie_limpia(df_original, mapping, "page_start")
+    paginas_fin = _serie_limpia(df_original, mapping, "page_end")
+    editoriales = _serie_limpia(df_original, mapping, "publisher")
+    urls = _serie_limpia(df_original, mapping, "url")
     abstracts = _serie_limpia(df_original, mapping, "abstract")
     author_keywords = _serie_limpia(df_original, mapping, "author_keywords")
     indexed_keywords = _serie_limpia(df_original, mapping, "indexed_keywords")
@@ -327,6 +350,16 @@ def procesar_csv_scopus(archivo):
                 "Cantidad de citas": citas.loc[indice],
                 "Tipo documento": tipos.loc[indice],
                 "DOI": dois.loc[indice],
+                "Revista/Conferencia": fuentes.loc[indice],
+                "Volumen": volumenes.loc[indice],
+                "Numero": numeros.loc[indice],
+                "Paginas": _combinar_paginas(
+                    paginas.loc[indice],
+                    paginas_inicio.loc[indice],
+                    paginas_fin.loc[indice],
+                ),
+                "URL": urls.loc[indice],
+                "Editorial": editoriales.loc[indice],
                 "Palabras Indexadas": palabras,
                 "Resumen 3 lineas": _resumen_tres_lineas(abstracts.loc[indice]),
                 "Justificación categoría": clasificacion["justificacion"],

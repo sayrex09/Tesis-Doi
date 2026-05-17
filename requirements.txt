@@ -4,3 +4,5 @@ numpy
 openpyxl
 requests
 rapidfuzz
+python-docx
+pypdf
